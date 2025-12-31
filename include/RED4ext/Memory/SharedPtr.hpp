@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <memory>
 
-#include <Windows.h>
+#include <RED4ext/Detail/WinCompat.hpp>
 
 #include <RED4ext/Common.hpp>
 #include <RED4ext/Detail/AddressHashes.hpp>

@@ -24,6 +24,10 @@
 #include <RED4ext/ISerializable.hpp>
 #include <RED4ext/Scripting/IScriptable.hpp>
 
+#ifndef RED4EXT_PLATFORM_MACOS
+#include <RED4ext/GpuApi/SwapChain.hpp>
+#endif
+
 #include <RED4ext/RTTISystem.hpp>
 #include <RED4ext/RTTITypes.hpp>
 #include <RED4ext/Scripting/CProperty.hpp>

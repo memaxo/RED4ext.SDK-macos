@@ -9,7 +9,6 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
-#include <intrin.h>
 #include <iomanip>
 #include <map>
 #include <memory>
@@ -30,4 +29,10 @@
 #include <variant>
 #include <vector>
 
+#if defined(_WIN32) || defined(_WIN64)
+#include <intrin.h>
 #include <Windows.h>
+#else
+// macOS/Linux - include platform compatibility header
+#include <RED4ext/Detail/WinCompat.hpp>
+#endif

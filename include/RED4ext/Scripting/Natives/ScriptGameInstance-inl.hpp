@@ -4,7 +4,11 @@
 #include <RED4ext/Scripting/Natives/ScriptGameInstance.hpp>
 #endif
 
+#if defined(_WIN32) || defined(_WIN64)
 #include <Windows.h>
+#else
+#include <RED4ext/Detail/WinCompat.hpp>
+#endif
 #include <mutex>
 
 #include <RED4ext/GameEngine.hpp>

@@ -5,9 +5,13 @@
 #endif
 
 #include <cstdint>
-#include <intrin.h>
 
+#if defined(_WIN32) || defined(_WIN64)
+#include <intrin.h>
 #include <Windows.h>
+#else
+#include <RED4ext/Detail/WinCompat.hpp>
+#endif
 
 RED4EXT_INLINE RED4ext::SharedSpinLock::SharedSpinLock()
     : state(0)

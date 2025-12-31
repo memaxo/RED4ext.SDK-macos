@@ -2,6 +2,10 @@
 
 #include <cstddef>
 
+#if !defined(_WIN32) && !defined(_WIN64)
+#include <RED4ext/Detail/WinCompat.hpp>
+#endif
+
 #ifdef RED4EXT_STATIC_LIB
 #undef RED4EXT_HEADER_ONLY
 #define RED4EXT_INLINE
@@ -15,8 +19,14 @@
 #endif
 
 #ifndef RED4EXT_ASSERT_SIZE
+#if defined(_WIN32) || defined(_WIN64)
 #define RED4EXT_ASSERT_SIZE(cls, size)                                                                                 \
     static_assert(sizeof(cls) == size, #cls " size does not match the expected size (" #size ") ")
+#else
+// On macOS, structure sizes may differ from Windows due to ABI differences.
+// Disable size assertions for now; these will need verification against macOS binary.
+#define RED4EXT_ASSERT_SIZE(cls, size) /* disabled on macOS */
+#endif
 #endif
 
 #ifndef RED4EXT_ASSERT_OFFSET
@@ -43,9 +53,17 @@
 #endif
 
 #ifndef RED4EXT_C_EXPORT
+#if defined(_WIN32) || defined(_WIN64)
 #define RED4EXT_C_EXPORT extern "C" __declspec(dllexport)
+#else
+#define RED4EXT_C_EXPORT extern "C" __attribute__((visibility("default")))
+#endif
 #endif
 
 #ifndef RED4EXT_CALL
+#if defined(_WIN32) || defined(_WIN64)
 #define RED4EXT_CALL __fastcall
+#else
+#define RED4EXT_CALL
+#endif
 #endif

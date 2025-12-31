@@ -6,6 +6,16 @@
 
 #include <mutex>
 #include <sstream>
+#include <iostream>
+
+#if defined(_WIN32) || defined(_WIN64)
+#include <Windows.h>
+#else
+#include <dlfcn.h>
+#include <mach-o/dyld.h>
+#include <codecvt>
+#include <locale>
+#endif
 
 #include <RED4ext/Api/SemVer.hpp>
 #include <RED4ext/Common.hpp>
@@ -13,7 +23,11 @@
 
 RED4EXT_INLINE uintptr_t RED4ext::RelocBase::GetImageBase()
 {
+#if defined(_WIN32) || defined(_WIN64)
     static const auto base = std::bit_cast<uintptr_t>(GetModuleHandle(nullptr));
+#else
+    static const auto base = std::bit_cast<uintptr_t>(_dyld_get_image_header(0));
+#endif
     return base;
 }
 
@@ -44,14 +58,24 @@ uintptr_t RED4ext::UniversalRelocBase::Resolve(uint32_t aHash)
 
 RED4EXT_INLINE HMODULE RED4ext::UniversalRelocBase::GetRED4extModule()
 {
+#if defined(_WIN32) || defined(_WIN64)
     static constexpr auto moduleName = L"RED4ext.dll";
-
     const auto handle = GetModuleHandleW(moduleName);
+#else
+    static constexpr auto moduleName = "RED4ext.dylib";
+    const auto handle = dlopen(moduleName, RTLD_LAZY | RTLD_NOLOAD);
+#endif
+
     if (!handle)
     {
         static constexpr auto msg =
+#if defined(_WIN32) || defined(_WIN64)
             L"The mod you are using could not locate the necessary module (i.e. RED4ext.dll) in the "
             L"loaded modules, which is required by the mod to resolve addresses correctly.\n"
+#else
+            L"The mod you are using could not locate the necessary module (i.e. RED4ext.dylib) in the "
+            L"loaded modules, which is required by the mod to resolve addresses correctly.\n"
+#endif
             L"This may occur if RED4ext is not properly loaded into the current process.\n"
             L"\n"
             L"Please ensure that RED4ext is correctly installed.\n"
@@ -59,7 +83,11 @@ RED4EXT_INLINE HMODULE RED4ext::UniversalRelocBase::GetRED4extModule()
             L"If you are the mod's developer, verify that your mod was loaded by RED4ext. "
             L"Alternatively, you may need to provide your own address resolver.";
 
+#if defined(_WIN32) || defined(_WIN64)
         ShowErrorAndTerminateProcess(msg, GetLastError());
+#else
+        ShowErrorAndTerminateProcess(msg, static_cast<uint32_t>(errno));
+#endif
     }
 
     return handle;
@@ -72,7 +100,12 @@ RED4EXT_INLINE RED4ext::UniversalRelocBase::ResolveFunc_t RED4ext::UniversalRelo
 
     const auto handle = GetRED4extModule();
 
+#if defined(_WIN32) || defined(_WIN64)
     const auto func = std::bit_cast<ResolveFunc_t>(GetProcAddress(handle, procName));
+#else
+    const auto func = std::bit_cast<ResolveFunc_t>(dlsym(handle, procName));
+#endif
+
     if (func == nullptr)
     {
         static constexpr auto msg =
@@ -83,7 +116,11 @@ RED4EXT_INLINE RED4ext::UniversalRelocBase::ResolveFunc_t RED4ext::UniversalRelo
             L"Please ensure that RED4ext is correctly installed AND that both RED4ext and the mod are "
             L"up-to-date.";
 
+#if defined(_WIN32) || defined(_WIN64)
         ShowErrorAndTerminateProcess(msg, GetLastError());
+#else
+        ShowErrorAndTerminateProcess(msg, static_cast<uint32_t>(errno));
+#endif
     }
 
     return func;
@@ -97,6 +134,7 @@ RED4EXT_INLINE RED4ext::UniversalRelocBase::ResolveFunc_t RED4ext::UniversalRelo
 
 RED4EXT_INLINE HMODULE RED4ext::UniversalRelocBase::GetCurrentModuleHandle()
 {
+#if defined(_WIN32) || defined(_WIN64)
     HMODULE result;
 
     if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
@@ -124,10 +162,19 @@ RED4EXT_INLINE HMODULE RED4ext::UniversalRelocBase::GetCurrentModuleHandle()
     }
 
     return result;
+#else
+    Dl_info info;
+    if (dladdr(std::bit_cast<void*>(&UniversalRelocBase::Resolve), &info))
+    {
+        return dlopen(info.dli_fname, RTLD_LAZY | RTLD_NOLOAD);
+    }
+    return nullptr;
+#endif
 }
 
 RED4EXT_INLINE std::filesystem::path RED4ext::UniversalRelocBase::GetCurrentModulePath()
 {
+#if defined(_WIN32) || defined(_WIN64)
     static constexpr auto pathLength = MAX_PATH;
     const auto handle = GetCurrentModuleHandle();
 
@@ -147,6 +194,14 @@ RED4EXT_INLINE std::filesystem::path RED4ext::UniversalRelocBase::GetCurrentModu
     }
 
     return fileName;
+#else
+    Dl_info info;
+    if (dladdr(std::bit_cast<void*>(&UniversalRelocBase::Resolve), &info))
+    {
+        return std::filesystem::path(info.dli_fname);
+    }
+    return {};
+#endif
 }
 
 RED4EXT_INLINE RED4ext::UniversalRelocBase::QueryFunc_t RED4ext::UniversalRelocBase::GetCurrentPluginQueryFunction()
@@ -155,7 +210,12 @@ RED4EXT_INLINE RED4ext::UniversalRelocBase::QueryFunc_t RED4ext::UniversalRelocB
 
     const auto handle = GetCurrentModuleHandle();
 
+#if defined(_WIN32) || defined(_WIN64)
     const auto func = std::bit_cast<QueryFunc_t>(GetProcAddress(handle, procName));
+#else
+    const auto func = std::bit_cast<QueryFunc_t>(dlsym(handle, procName));
+#endif
+
     if (func == nullptr)
     {
         static constexpr auto msg = L"Could not get the 'Query' function for the current mod.\n"
@@ -165,7 +225,11 @@ RED4EXT_INLINE RED4ext::UniversalRelocBase::QueryFunc_t RED4ext::UniversalRelocB
                                     L"that it exports the 'Query' function needed for the mod to interact with "
                                     L"RED4ext. Alternatively, you may need to provide your own address resolver.";
 
+#if defined(_WIN32) || defined(_WIN64)
         ShowErrorAndTerminateProcess(msg, GetLastError(), false);
+#else
+        ShowErrorAndTerminateProcess(msg, static_cast<uint32_t>(errno), false);
+#endif
     }
 
     return func;
@@ -197,7 +261,13 @@ RED4EXT_INLINE void RED4ext::UniversalRelocBase::ShowErrorAndTerminateProcess(st
 {
     const auto path = GetCurrentModulePath();
 
-    std::wstring pluginName = path.stem();
+#if defined(_WIN32) || defined(_WIN64)
+    std::wstring pluginName = path.stem().wstring();
+#else
+    // Convert narrow string to wide string on macOS
+    auto stemStr = path.stem().string();
+    std::wstring pluginName(stemStr.begin(), stemStr.end());
+#endif
     std::wstring pluginVersion = L"Not available (Query was intentionally disabled)";
 
     if (aQueryPluginInfo)
@@ -229,11 +299,39 @@ RED4EXT_INLINE void RED4ext::UniversalRelocBase::ShowErrorAndTerminateProcess(st
            L"the game's process to prevent unexpected behavior in the game.\n"
         << L"-----------------------------\n"
         << L"Here is some debug information that may help resolve or report the issue:\n"
-        << L"    - Error Code (Win32): " << std::dec << aLastError << "\n"
+        << L"    - Error Code (Platform): " << std::dec << aLastError << "\n"
         << L"    - Plugin: " << pluginName << "\n"
         << L"    - Version: " << pluginVersion << "\n"
         << L"    - Path: " << path.c_str();
 
+#if defined(_WIN32) || defined(_WIN64)
     MessageBoxW(nullptr, msg.str().c_str(), title.c_str(), MB_ICONERROR | MB_OK);
     TerminateProcess(GetCurrentProcess(), 1);
+#else
+    // Convert wide string to narrow string for std::cerr on macOS
+    auto msgStr = msg.str();
+    auto titleStr = title;
+    
+    // Simple UTF-16 to UTF-8 conversion
+    std::string narrowTitle, narrowMsg;
+    for (wchar_t c : titleStr)
+    {
+        if (c < 0x80)
+            narrowTitle += static_cast<char>(c);
+        else
+            narrowTitle += '?'; // Replace non-ASCII with ?
+    }
+    for (wchar_t c : msgStr)
+    {
+        if (c < 0x80)
+            narrowMsg += static_cast<char>(c);
+        else if (c == L'\n')
+            narrowMsg += '\n';
+        else
+            narrowMsg += '?';
+    }
+    
+    std::cerr << "[" << narrowTitle << "] " << narrowMsg << std::endl;
+    exit(1);
+#endif
 }

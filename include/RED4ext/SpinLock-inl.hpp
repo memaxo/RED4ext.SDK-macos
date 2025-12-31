@@ -6,7 +6,11 @@
 
 #include <cstdint>
 
+#if defined(_WIN32) || defined(_WIN64)
 #include <Windows.h>
+#else
+#include <RED4ext/Detail/WinCompat.hpp>
+#endif
 
 RED4EXT_INLINE RED4ext::SpinLock::SpinLock()
     : state(0)

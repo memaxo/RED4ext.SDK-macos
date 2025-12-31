@@ -4,7 +4,7 @@
 #include <filesystem>
 #include <string_view>
 
-#include <Windows.h>
+#include <RED4ext/Detail/WinCompat.hpp>
 
 #include <RED4ext/Api/Sdk.hpp>
 

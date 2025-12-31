@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Windows.h>
+#include <RED4ext/Detail/WinCompat.hpp>
 #include <cstdint>
 
 #include <RED4ext/CName.hpp>

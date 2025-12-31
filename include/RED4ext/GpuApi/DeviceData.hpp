@@ -1,10 +1,12 @@
 #pragma once
 
 #include <RED4ext/Common.hpp>
+#ifndef RED4EXT_PLATFORM_MACOS
 #include <RED4ext/GpuApi/Buffer.hpp>
 #include <RED4ext/GpuApi/CommandListContext.hpp>
 #include <RED4ext/GpuApi/D3D12MemAlloc.hpp>
 #include <RED4ext/GpuApi/SwapChain.hpp>
+#endif
 #include <RED4ext/SpinLock.hpp>
 
 #include <cassert>
