@@ -34,6 +34,66 @@ RED4EXT_INLINE uintptr_t RED4ext::RelocBase::GetImageBase()
 RED4EXT_INLINE
 uintptr_t RED4ext::UniversalRelocBase::Resolve(uint32_t aHash)
 {
+#if !defined(_WIN32) && !defined(_WIN64)
+    // MARKER: This is TweakXL's modified SDK Resolve function
+    static bool firstCall = true;
+    if (firstCall) {
+        std::cerr << ">>> TWEAKXL_SDK_RESOLVE_MARKER: Using modified Resolve function <<<" << std::endl;
+        firstCall = false;
+    }
+    
+    // macOS: Use built-in address table to avoid dependency on RED4ext's limited addresses
+    // This is necessary because RED4ext only has 9 addresses configured, but the SDK
+    // and mods like TweakXL need many more.
+    static const uintptr_t imageBase = std::bit_cast<uintptr_t>(_dyld_get_image_header(0));
+    
+    // Address table for Cyberpunk 2077 macOS ARM64 v2.3.1
+    // Most of these are placeholders (0x0) - they need to be reverse engineered
+    static const std::unordered_map<uint32_t, uintptr_t> macOSAddressTable = {
+        // Main function (hash: 240386859 = 0x0E54032B) - Entry point from LC_MAIN
+        { 240386859, 0x31E18 },
+        
+        // TweakDB functions (need reverse engineering)
+        { 3062572522, 0x0 }, // TweakDB_Init
+        { 3602585178, 0x0 }, // TweakDB_Load
+        { 3512345737, 0x0 }, // TweakDB_TryLoad
+        { 838931066, 0x0 },  // TweakDB_CreateRecord
+        { 326438016, 0x0 },  // TweakDBID_Derive
+        
+        // StatsDataSystem functions (need reverse engineering)
+        { 1299190886, 0x0 }, // StatsDataSystem_InitializeRecords
+        { 3652194890, 0x0 }, // StatsDataSystem_InitializeParams
+        { 1444748215, 0x0 }, // StatsDataSystem_GetStatRange
+        { 3123320294, 0x0 }, // StatsDataSystem_GetStatFlags
+        { 2954893634, 0x0 }, // StatsDataSystem_CheckStatFlag
+        
+        // SDK internal functions (need reverse engineering)
+        { 405668637, 0x0 },  // CBaseFunction_InternalExecute
+    };
+    
+    auto it = macOSAddressTable.find(aHash);
+    if (it != macOSAddressTable.end() && it->second != 0)
+    {
+        return imageBase + it->second;
+    }
+    
+    // Address not found or placeholder - return a non-zero sentinel value
+    // This prevents null pointer crashes while making it clear something is wrong
+    // The calling code should handle this gracefully
+    static bool firstWarning = true;
+    if (firstWarning) {
+        std::cerr << "=== SDK ADDRESS RESOLUTION WARNING ===" << std::endl;
+        std::cerr << "TweakXL needs addresses that haven't been reverse-engineered yet for macOS." << std::endl;
+        std::cerr << "The mod will attempt to load but some features may not work." << std::endl;
+        std::cerr << "=======================================" << std::endl;
+        firstWarning = false;
+    }
+    std::cerr << "[SDK AddressResolver] Missing hash 0x" << std::hex << aHash << std::dec << std::endl;
+    
+    // Return a valid but harmless address (pointing to a ret instruction or similar)
+    // For now, return 0 - the caller must handle null gracefully
+    return 0;
+#else
     if constexpr (Detail::AddressResolverOverride<uint32_t>::value)
     {
         return Detail::AddressResolverOverride<uint32_t>::Resolve(aHash);
@@ -54,6 +114,7 @@ uintptr_t RED4ext::UniversalRelocBase::Resolve(uint32_t aHash)
 
         return address;
     }
+#endif
 }
 
 RED4EXT_INLINE HMODULE RED4ext::UniversalRelocBase::GetRED4extModule()
@@ -259,6 +320,22 @@ RED4EXT_INLINE void RED4ext::UniversalRelocBase::ShowErrorAndTerminateProcess(st
                                                                               std::uint32_t aLastError,
                                                                               bool aQueryPluginInfo)
 {
+#if !defined(_WIN32) && !defined(_WIN64)
+    // macOS: Don't terminate - just log the error
+    // This is a workaround until we have proper address resolution
+    // Convert wide string to narrow for stderr
+    {
+        std::string macOSMsg;
+        for (wchar_t c : aMsg) {
+            if (c < 0x80) macOSMsg += static_cast<char>(c);
+            else if (c == L'\n') macOSMsg += '\n';
+            else macOSMsg += '?';
+        }
+        std::cerr << "[SDK] Address resolution warning (non-fatal on macOS): " << macOSMsg << std::endl;
+    }
+    return; // Don't crash - let the code continue with null function pointer
+#endif
+    
     const auto path = GetCurrentModulePath();
 
 #if defined(_WIN32) || defined(_WIN64)

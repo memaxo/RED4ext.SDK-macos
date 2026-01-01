@@ -119,17 +119,46 @@ class UniversalRelocFunc : private UniversalRelocBase
 {
 public:
     UniversalRelocFunc(uint32_t aHash)
+#if !defined(_WIN32) && !defined(_WIN64)
+        // macOS: Defer address resolution until first use to avoid issues during global init
+        : m_hash(aHash)
+        , m_address(nullptr)
+        , m_resolved(false)
+#else
         : m_address(reinterpret_cast<T>(Resolve(aHash)))
+#endif
     {
     }
 
     inline operator T() const
     {
+#if !defined(_WIN32) && !defined(_WIN64)
+        if (!m_resolved)
+        {
+            const_cast<UniversalRelocFunc*>(this)->m_address = reinterpret_cast<T>(Resolve(m_hash));
+            const_cast<UniversalRelocFunc*>(this)->m_resolved = true;
+        }
+#endif
         return m_address;
+    }
+    
+    inline bool IsValid() const
+    {
+#if !defined(_WIN32) && !defined(_WIN64)
+        // Trigger resolution if needed
+        static_cast<void>(static_cast<T>(*this));
+#endif
+        return m_address != nullptr;
     }
 
 private:
+#if !defined(_WIN32) && !defined(_WIN64)
+    uint32_t m_hash;
+    mutable T m_address;
+    mutable bool m_resolved;
+#else
     T m_address;
+#endif
 };
 
 /**
@@ -141,22 +170,50 @@ class UniversalRelocPtr : private UniversalRelocBase
 {
 public:
     UniversalRelocPtr(uint32_t aHash)
+#if !defined(_WIN32) && !defined(_WIN64)
+        // macOS: Defer address resolution until first use
+        : m_hash(aHash)
+        , m_address(nullptr)
+        , m_resolved(false)
+#else
         : m_address(reinterpret_cast<T*>(Resolve(aHash)))
+#endif
     {
     }
 
     inline operator T() const
     {
+#if !defined(_WIN32) && !defined(_WIN64)
+        if (!m_resolved)
+        {
+            const_cast<UniversalRelocPtr*>(this)->m_address = reinterpret_cast<T*>(Resolve(m_hash));
+            const_cast<UniversalRelocPtr*>(this)->m_resolved = true;
+        }
+        if (!m_address) return T{};  // Return default for unresolved addresses
+#endif
         return *m_address;
     }
 
     inline T* GetAddr() const
     {
+#if !defined(_WIN32) && !defined(_WIN64)
+        if (!m_resolved)
+        {
+            const_cast<UniversalRelocPtr*>(this)->m_address = reinterpret_cast<T*>(Resolve(m_hash));
+            const_cast<UniversalRelocPtr*>(this)->m_resolved = true;
+        }
+#endif
         return m_address;
     }
 
 private:
+#if !defined(_WIN32) && !defined(_WIN64)
+    uint32_t m_hash;
+    mutable T* m_address;
+    mutable bool m_resolved;
+#else
     T* m_address;
+#endif
 };
 
 /**
@@ -167,17 +224,37 @@ class UniversalRelocVtbl : private UniversalRelocBase
 {
 public:
     UniversalRelocVtbl(uint32_t aHash)
+#if !defined(_WIN32) && !defined(_WIN64)
+        // macOS: Defer address resolution until first use
+        : m_hash(aHash)
+        , m_address(nullptr)
+        , m_resolved(false)
+#else
         : m_address(reinterpret_cast<uintptr_t*>(Resolve(aHash)))
+#endif
     {
     }
 
     inline operator uintptr_t*() const
     {
+#if !defined(_WIN32) && !defined(_WIN64)
+        if (!m_resolved)
+        {
+            const_cast<UniversalRelocVtbl*>(this)->m_address = reinterpret_cast<uintptr_t*>(Resolve(m_hash));
+            const_cast<UniversalRelocVtbl*>(this)->m_resolved = true;
+        }
+#endif
         return m_address;
     }
 
 private:
+#if !defined(_WIN32) && !defined(_WIN64)
+    uint32_t m_hash;
+    mutable uintptr_t* m_address;
+    mutable bool m_resolved;
+#else
     uintptr_t* m_address;
+#endif
 };
 
 } // namespace RED4ext
