@@ -7,41 +7,60 @@ SDK for creating RED4ext plugins on **macOS Apple Silicon**.
 
 ---
 
-## Status
+## ⚠️ Beta Status
+
+This SDK enables plugin development on macOS but **does not guarantee full parity with Windows**.
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Address resolution | ✅ Production | 126/126 addresses |
-| RTTI types | ✅ Complete | All game types |
-| TweakDB access | ✅ Working | Full read/write |
-| Script system | ✅ Working | Function registration |
-| Memory management | ✅ Working | Game allocator access |
+| Address resolution | ⚠️ Functional | 126 addresses found, not all runtime-verified |
+| RTTI types | ⚠️ Ported | May have alignment/vtable differences |
+| TweakDB access | ✅ Tested | Basic operations verified |
+| Script system | ⚠️ Ported | Not comprehensively tested |
+| Memory management | ⚠️ Ported | Uses platform equivalents |
 
-**Platform:** macOS 12+ on Apple Silicon (M1/M2/M3/M4)  
-**Game Version:** Cyberpunk 2077 v2.3.1 (macOS)
+### Known Differences from Windows
+
+| Aspect | Windows | macOS |
+|--------|---------|-------|
+| Binary format | PE/x64 | Mach-O/ARM64 |
+| ABI | Microsoft x64 | ARM64 AAPCS |
+| TLS access | `__readgsqword` | pthread TLS |
+| Atomics | `Interlocked*` | `__atomic_*` |
+| Hooking | Detours | Frida |
+
+**Some SDK functions may behave differently or fail silently.**
+
+---
+
+## Platform Requirements
+
+- **macOS 12+** (Monterey or later)
+- **Apple Silicon** (M1/M2/M3/M4)
+- **Cyberpunk 2077 v2.3.1** (macOS Steam version)
 
 ---
 
 ## Quick Start
 
-### Installation (as submodule)
+### As Git Submodule
 
-\`\`\`bash
+```bash
 git submodule add https://github.com/memaxo/RED4ext.SDK.git deps/red4ext.sdk
-\`\`\`
+```
 
 ### CMake Integration
 
-\`\`\`cmake
+```cmake
 add_subdirectory(deps/red4ext.sdk)
 target_link_libraries(your_plugin PRIVATE RED4ext::SDK)
-\`\`\`
+```
 
 ---
 
-## Basic Plugin Example
+## Basic Plugin
 
-\`\`\`cpp
+```cpp
 #include <RED4ext/RED4ext.hpp>
 
 RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::PluginHandle aHandle,
@@ -72,22 +91,23 @@ RED4EXT_C_EXPORT uint32_t RED4EXT_CALL Supports()
 {
     return RED4EXT_API_VERSION_LATEST;
 }
-\`\`\`
+```
 
 ---
 
 ## Address Resolution
 
-The SDK resolves 126 game function addresses from \`cyberpunk2077_addresses.json\`. This file must be present in the \`red4ext/\` directory.
+The SDK resolves 126 game addresses from `cyberpunk2077_addresses.json`.
 
-### Manual Address Override (for custom plugins)
+⚠️ **Important:** Addresses were discovered via pattern matching. Not all have been verified at runtime. If your plugin crashes, the address may be incorrect.
 
-If your plugin needs addresses not in the SDK, create an override header:
+### Custom Address Override
 
-\`\`\`cpp
+For addresses not in the SDK or to fix incorrect ones:
+
+```cpp
 // AddressResolverOverride.hpp - include BEFORE any SDK headers
 #pragma once
-
 #include <cstdint>
 #include <unordered_map>
 
@@ -96,93 +116,87 @@ namespace RED4ext::Detail
     struct AddressResolverOverride {
         static std::uintptr_t Resolve(std::uint32_t aHash) {
             static const std::unordered_map<std::uint32_t, std::uintptr_t> table = {
-                { 0xYOURHASH, 0xOFFSET },  // Your custom address
+                { 0xYOURHASH, 0xOFFSET },
             };
             auto it = table.find(aHash);
             return (it != table.end()) ? it->second : 0;
         }
     };
 }
-\`\`\`
+```
 
 ---
 
-## macOS Compatibility
+## macOS Platform Layer
 
-This fork includes platform adaptations for Apple Silicon:
+This fork provides macOS equivalents for Windows APIs:
 
-| Windows API | macOS Equivalent |
-|-------------|------------------|
-| \`__readgsqword\` (TLS) | \`pthread_key_t\` |
-| \`CRITICAL_SECTION\` | \`pthread_mutex_t\` |
-| \`Interlocked*\` | \`__atomic_*\` builtins |
-| \`LoadLibrary\` / \`GetProcAddress\` | \`dlopen\` / \`dlsym\` |
-| \`VirtualAlloc\` / \`VirtualProtect\` | \`mmap\` / \`mprotect\` |
+| Windows API | macOS Implementation |
+|-------------|---------------------|
+| `__readgsqword` (TLS) | `pthread_key_t` + runtime init |
+| `CRITICAL_SECTION` | `pthread_mutex_t` |
+| `Interlocked*` | `__atomic_*` builtins |
+| `LoadLibrary` | `dlopen` |
+| `GetProcAddress` | `dlsym` |
+| `VirtualAlloc` | `mmap` |
+| `VirtualProtect` | `mprotect` |
 
-See [MACOS_CHANGES.md](MACOS_CHANGES.md) for implementation details.
+See [MACOS_CHANGES.md](MACOS_CHANGES.md) for details.
 
 ---
 
 ## Examples
 
-The \`examples/\` directory contains working plugin examples:
+The `examples/` directory contains plugin examples:
 
-| Example | Description |
-|---------|-------------|
-| \`accessing_properties\` | Read/write class properties |
-| \`execute_functions\` | Call game functions |
-| \`function_registration\` | Register new script functions |
-| \`native_class_redscript\` | Expose C++ class to scripts |
-| \`native_globals_redscript\` | Expose global functions |
+| Example | Description | macOS Status |
+|---------|-------------|--------------|
+| `accessing_properties` | Read/write class properties | ❓ Untested |
+| `execute_functions` | Call game functions | ❓ Untested |
+| `function_registration` | Register script functions | ❓ Untested |
+| `native_class_redscript` | Expose C++ class | ❓ Untested |
+| `native_globals_redscript` | Expose globals | ❓ Untested |
 
-### Build Examples
+```bash
+cd examples && mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(sysctl -n hw.ncpu)
+```
 
-\`\`\`bash
-cd examples
+---
+
+## Building
+
+The SDK is mostly header-only:
+
+```bash
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j\$(sysctl -n hw.ncpu)
-\`\`\`
+make -j$(sysctl -n hw.ncpu)
+```
 
 ---
 
-## Building the SDK
+## Porting Windows Plugins
 
-The SDK is mostly header-only. Build only if you need the reflection helpers:
+To port a Windows plugin to macOS:
 
-\`\`\`bash
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j\$(sysctl -n hw.ncpu)
-\`\`\`
-
----
-
-## Project Structure
-
-\`\`\`
-RED4ext.SDK/
-├── include/RED4ext/        # Main SDK headers
-│   ├── Detail/             # Implementation details
-│   ├── Scripting/          # Script system types
-│   ├── TweakDB.hpp         # TweakDB interface
-│   ├── Relocation.hpp      # Address resolution
-│   └── Common.hpp          # Platform types
-├── src/                    # Compiled components
-├── examples/               # Plugin examples
-├── scripts/                # Utility scripts
-└── cyberpunk2077_addresses.json  # Address database
-\`\`\`
+1. Replace Windows headers with macOS equivalents
+2. Update any inline assembly (x64 → ARM64)
+3. Fix path separators (`\` → `/`)
+4. Recompile as .dylib
+5. Test thoroughly — behavior may differ
 
 ---
 
-## Documentation
+## Contributing
 
-| Document | Description |
-|----------|-------------|
-| [MACOS_CHANGES.md](MACOS_CHANGES.md) | Platform adaptation details |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
-| [AGENTS.md](AGENTS.md) | Development guidelines |
+Help improve macOS support:
+
+- Verify addresses at runtime
+- Test SDK examples
+- Report bugs with stack traces
+- Port popular plugins
 
 ---
 
@@ -192,7 +206,7 @@ RED4ext.SDK/
 |---------|-------------|
 | [RED4ext](https://github.com/memaxo/RED4ext) | macOS loader |
 | [RED4ext.SDK](https://github.com/WopsS/RED4ext.SDK) | Original Windows SDK |
-| [TweakXL-macos](https://github.com/memaxo/cp2077-tweak-xl) | Example plugin |
+| [TweakXL-macos](https://github.com/memaxo/cp2077-tweak-xl) | Tested example plugin |
 
 ---
 
