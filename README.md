@@ -7,24 +7,41 @@ SDK for creating RED4ext plugins on **macOS Apple Silicon**.
 
 ---
 
-## About
+## Status
 
-This SDK provides the reversed game types and helper functions needed to create RED4ext plugins for Cyberpunk 2077 on macOS. It includes:
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Address resolution | ✅ Production | 126/126 addresses |
+| RTTI types | ✅ Complete | All game types |
+| TweakDB access | ✅ Working | Full read/write |
+| Script system | ✅ Working | Function registration |
+| Memory management | ✅ Working | Game allocator access |
 
-- Reversed engine types
-- Helper functions for scripting
-- Memory management utilities
-- RTTI system access
+**Platform:** macOS 12+ on Apple Silicon (M1/M2/M3/M4)  
+**Game Version:** Cyberpunk 2077 v2.3.1 (macOS)
 
 ---
 
-## Usage
+## Quick Start
 
-This SDK is included as a **git submodule** in [RED4ext-macos](https://github.com/memaxo/RED4ext-macos). You typically don't need to clone it separately.
+### Installation (as submodule)
 
-### For Plugin Development
+\`\`\`bash
+git submodule add https://github.com/memaxo/RED4ext.SDK.git deps/red4ext.sdk
+\`\`\`
 
-```cpp
+### CMake Integration
+
+\`\`\`cmake
+add_subdirectory(deps/red4ext.sdk)
+target_link_libraries(your_plugin PRIVATE RED4ext::SDK)
+\`\`\`
+
+---
+
+## Basic Plugin Example
+
+\`\`\`cpp
 #include <RED4ext/RED4ext.hpp>
 
 RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::PluginHandle aHandle,
@@ -55,53 +72,127 @@ RED4EXT_C_EXPORT uint32_t RED4EXT_CALL Supports()
 {
     return RED4EXT_API_VERSION_LATEST;
 }
-```
-
-### CMake Integration
-
-```cmake
-# The SDK is available via RED4ext-macos submodule
-target_link_libraries(your_plugin PRIVATE RED4ext::SDK)
-```
+\`\`\`
 
 ---
 
-## macOS Changes
+## Address Resolution
 
-This fork includes compatibility changes for Apple Silicon:
+The SDK resolves 126 game function addresses from \`cyberpunk2077_addresses.json\`. This file must be present in the \`red4ext/\` directory.
 
-| Component | Change |
-|-----------|--------|
-| TLS | `pthread_key_t` instead of `__readgsqword` |
-| Mutex | `pthread_mutex_t` instead of `CRITICAL_SECTION` |
-| Atomics | `__atomic_*` instead of `Interlocked*` |
-| Modules | `dlopen/dlsym` instead of `LoadLibrary` |
+### Manual Address Override (for custom plugins)
 
-See [MACOS_CHANGES.md](MACOS_CHANGES.md) for full details.
+If your plugin needs addresses not in the SDK, create an override header:
+
+\`\`\`cpp
+// AddressResolverOverride.hpp - include BEFORE any SDK headers
+#pragma once
+
+#include <cstdint>
+#include <unordered_map>
+
+namespace RED4ext::Detail
+{
+    struct AddressResolverOverride {
+        static std::uintptr_t Resolve(std::uint32_t aHash) {
+            static const std::unordered_map<std::uint32_t, std::uintptr_t> table = {
+                { 0xYOURHASH, 0xOFFSET },  // Your custom address
+            };
+            auto it = table.find(aHash);
+            return (it != table.end()) ? it->second : 0;
+        }
+    };
+}
+\`\`\`
 
 ---
 
-## Building
+## macOS Compatibility
 
-You don't usually need to build the SDK separately. It's header-only and included via RED4ext-macos.
+This fork includes platform adaptations for Apple Silicon:
 
-If you need to build standalone:
+| Windows API | macOS Equivalent |
+|-------------|------------------|
+| \`__readgsqword\` (TLS) | \`pthread_key_t\` |
+| \`CRITICAL_SECTION\` | \`pthread_mutex_t\` |
+| \`Interlocked*\` | \`__atomic_*\` builtins |
+| \`LoadLibrary\` / \`GetProcAddress\` | \`dlopen\` / \`dlsym\` |
+| \`VirtualAlloc\` / \`VirtualProtect\` | \`mmap\` / \`mprotect\` |
 
-```bash
-git clone https://github.com/memaxo/RED4ext.SDK-macos.git
-cd RED4ext.SDK-macos
+See [MACOS_CHANGES.md](MACOS_CHANGES.md) for implementation details.
+
+---
+
+## Examples
+
+The \`examples/\` directory contains working plugin examples:
+
+| Example | Description |
+|---------|-------------|
+| \`accessing_properties\` | Read/write class properties |
+| \`execute_functions\` | Call game functions |
+| \`function_registration\` | Register new script functions |
+| \`native_class_redscript\` | Expose C++ class to scripts |
+| \`native_globals_redscript\` | Expose global functions |
+
+### Build Examples
+
+\`\`\`bash
+cd examples
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j$(sysctl -n hw.ncpu)
-```
+make -j\$(sysctl -n hw.ncpu)
+\`\`\`
+
+---
+
+## Building the SDK
+
+The SDK is mostly header-only. Build only if you need the reflection helpers:
+
+\`\`\`bash
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j\$(sysctl -n hw.ncpu)
+\`\`\`
+
+---
+
+## Project Structure
+
+\`\`\`
+RED4ext.SDK/
+├── include/RED4ext/        # Main SDK headers
+│   ├── Detail/             # Implementation details
+│   ├── Scripting/          # Script system types
+│   ├── TweakDB.hpp         # TweakDB interface
+│   ├── Relocation.hpp      # Address resolution
+│   └── Common.hpp          # Platform types
+├── src/                    # Compiled components
+├── examples/               # Plugin examples
+├── scripts/                # Utility scripts
+└── cyberpunk2077_addresses.json  # Address database
+\`\`\`
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [MACOS_CHANGES.md](MACOS_CHANGES.md) | Platform adaptation details |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
+| [AGENTS.md](AGENTS.md) | Development guidelines |
 
 ---
 
 ## Related Projects
 
-- [RED4ext-macos](https://github.com/memaxo/RED4ext-macos) — macOS loader (uses this SDK)
-- [RED4ext.SDK](https://github.com/WopsS/RED4ext.SDK) — Original Windows SDK
-- [RED4ext](https://github.com/WopsS/RED4ext) — Original Windows loader
+| Project | Description |
+|---------|-------------|
+| [RED4ext](https://github.com/memaxo/RED4ext) | macOS loader |
+| [RED4ext.SDK](https://github.com/WopsS/RED4ext.SDK) | Original Windows SDK |
+| [TweakXL-macos](https://github.com/memaxo/cp2077-tweak-xl) | Example plugin |
 
 ---
 
@@ -109,6 +200,7 @@ make -j$(sysctl -n hw.ncpu)
 
 MIT License — see [LICENSE.md](LICENSE.md)
 
-## Acknowledgments
+## Credits
 
 - **WopsS** — Original RED4ext.SDK author
+- **Cyberpunk 2077 modding community**
