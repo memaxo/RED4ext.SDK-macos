@@ -23,6 +23,8 @@ struct Vector2
     {
     }
 
+    constexpr Vector2(const Vector2&) noexcept = default;
+
     inline Vector2& operator=(const Vector2& aOther)
     {
         if (this != std::addressof(aOther))

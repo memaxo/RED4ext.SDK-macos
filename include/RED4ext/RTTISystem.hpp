@@ -114,7 +114,7 @@ struct RTTIRegistrator
      * @note Every type in RED4 has a unique identifier assigned to it, reusing the IDs manually might lead to a crash,
      * thus we are using the game's counter to create our own types.
      */
-    static const uint32_t GetNextId();
+    static uint32_t GetNextId();
 };
 RED4EXT_ASSERT_SIZE(RTTIRegistrator, 0x01);
 

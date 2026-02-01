@@ -17,6 +17,7 @@ struct AddressResolverOverride : std::false_type
 {
     inline static uintptr_t Resolve(T aHash)
     {
+        (void)aHash;
         return 0;
     }
 };

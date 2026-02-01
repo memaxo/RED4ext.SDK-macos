@@ -18,6 +18,8 @@ struct CName
     {
     }
 
+    constexpr CName(const CName&) noexcept = default;
+
     constexpr CName(const char* aName) noexcept
         : hash(FNV1a64(aName))
     {

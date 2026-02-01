@@ -111,6 +111,7 @@ void Call(Func f, Ret* ret, Args&&... args)
 template<class Func, class... Args>
 void Call(Func f, void* ret, Args&&... args)
 {
+    (void)ret;
     std::apply(f, std::forward<Args>(args)...);
 }
 } // namespace details

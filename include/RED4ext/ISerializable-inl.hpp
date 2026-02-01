@@ -10,7 +10,7 @@
 
 RED4EXT_INLINE RED4ext::ISerializable::ISerializable()
 {
-    static UniversalRelocPtr<volatile int64_t> s_globalIDCounter{Detail::AddressHashes::ISerializable_Counter};
+    static UniversalRelocPtr<int64_t> s_globalIDCounter{Detail::AddressHashes::ISerializable_Counter};
 
     unk28 = InterlockedIncrement64(s_globalIDCounter.GetAddr());
 }

@@ -25,6 +25,8 @@ struct Vector3
     {
     }
 
+    constexpr Vector3(const Vector3&) noexcept = default;
+
     inline Vector3& operator=(const Vector3& aOther)
     {
         if (this != std::addressof(aOther))

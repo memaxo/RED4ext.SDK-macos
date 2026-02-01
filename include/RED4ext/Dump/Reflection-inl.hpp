@@ -131,7 +131,7 @@ RED4EXT_INLINE void Dump(std::filesystem::path aOutPath, std::filesystem::path a
         // Special case for localization (prevents loc::alization and rend::er namespaces)
         if (prefix != "localization" && prefix != "render")
         {
-            for (auto i = 0; i < prefix.size(); ++i)
+            for (size_t i = 0; i < prefix.size(); ++i)
             {
                 auto testPrefix = prefix.substr(0, i + 1);
 
@@ -409,6 +409,8 @@ RED4EXT_INLINE void Dump(std::filesystem::path aOutPath, std::filesystem::path a
                 }
                 break;
             }
+            default:
+                break;
             }
         });
 

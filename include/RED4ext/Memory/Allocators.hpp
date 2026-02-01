@@ -32,9 +32,9 @@ struct IAllocator
                                             uint32_t aAlignment) const = 0; // 16
     virtual void Free(AllocationResult& aAllocation) const = 0;             // 20
     virtual void sub_28(void* a1) const = 0;                                // 28
-    virtual const uint32_t GetHandle() const = 0;                           // 30
+    virtual uint32_t GetHandle() const = 0;                           // 30
 
-    [[deprecated("Use 'GetHandle()' instead.")]] const uint32_t GetId() const
+    [[deprecated("Use 'GetHandle()' instead.")]] uint32_t GetId() const
     {
         return GetHandle();
     }
@@ -81,7 +81,7 @@ struct Allocator : IAllocator
 
     virtual AllocationResult Alloc(uint64_t aSize) const override
     {
-        using alloc_t = void(__fastcall*)(Vault*, AllocationResult*, uint64_t);
+        using alloc_t = void(RED4EXT_CALL*)(Vault*, AllocationResult*, uint64_t);
         static UniversalRelocFunc<alloc_t> alloc(Detail::AddressHashes::Memory_Vault_Alloc);
 
         auto pool = T::Get();
@@ -172,7 +172,7 @@ struct Allocator : IAllocator
         func(storage, a2);
     }
 
-    virtual const uint32_t GetHandle() const override
+    virtual uint32_t GetHandle() const override
     {
         auto pool = T::Get();
         return pool->handle;

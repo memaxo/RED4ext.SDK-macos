@@ -363,6 +363,7 @@ FodyWeavers.xsd
 
 ### Custom ###
 build
+build-macos*
 premake/projects
 premake/premake5.exe
 

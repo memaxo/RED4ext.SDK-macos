@@ -13,7 +13,7 @@ namespace RED4ext
 template<typename T, typename enabled = void /* for enable_if specialization */>
 struct HashMapHash
 {
-    uint32_t operator()(const T& aKey) const noexcept
+    uint32_t operator()(const T&) const noexcept
     {
         // You can pass your own hasher as the 3rd template argument to the HashMap
         // Or you can make a specialized version of this class

@@ -50,6 +50,10 @@ if(PROJECT_IS_TOP_LEVEL)
       add_compile_options(-Werror)
     endif()
   endif()
+
+  if(NOT MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_compile_options(-Wno-unknown-pragmas)
+  endif()
 endif()
 
 # -----------------------------------------------------------------------------
@@ -74,6 +78,11 @@ if(RED4EXT_HEADER_ONLY)
 else()
   file(GLOB_RECURSE RED4EXT_HEADER_FILES "${RED4EXT_INCLUDE_DIR}/*.hpp")
   file(GLOB_RECURSE RED4EXT_SRC_FILES "${PROJECT_SOURCE_DIR}/src/*.cpp")
+
+  if(APPLE)
+    # The GPU API layer is Windows/D3D12-specific.
+    list(FILTER RED4EXT_SRC_FILES EXCLUDE REGEX ".*/src/GpuApi/.*\\.cpp$")
+  endif()
 
   get_property(RED4EXT_USE_FOLDERS GLOBAL PROPERTY USE_FOLDERS)
   if(RED4EXT_USE_FOLDERS)

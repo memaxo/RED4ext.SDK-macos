@@ -22,6 +22,11 @@
 #include <RED4ext/SharedSpinLock.hpp>
 #include <RED4ext/SortedArray.hpp>
 
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
+#endif
+
 namespace RED4ext
 {
 // Issues with current API:
@@ -136,7 +141,9 @@ struct TweakDB
             return &data;
         }
 
+#if defined(_MSC_VER)
 #pragma warning(suppress : 4324)
+#endif
         T data;
     };
     using QuaternionFlatValue = FlatValueImpl<Quaternion, CName("Quaternion")>;
@@ -241,6 +248,9 @@ RED4EXT_ASSERT_OFFSET(TweakDB, flats, 0x40);
 RED4EXT_ASSERT_OFFSET(TweakDB, flatDataBuffer, 0x148);
 RED4EXT_ASSERT_OFFSET(TweakDB, unk160, 0x160);
 RED4EXT_ASSERT_SIZE(TweakDB, 0x168);
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 } // namespace RED4ext
 
 #ifdef RED4EXT_HEADER_ONLY

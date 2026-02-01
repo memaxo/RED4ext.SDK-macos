@@ -7,12 +7,20 @@
 #include <mutex>
 #include <sstream>
 #include <iostream>
+#include <unordered_map>
+#include <fstream>
+#include <charconv>
+#include <cstdlib>
+#include <utility>
+#include <system_error>
+#include <atomic>
 
 #if defined(_WIN32) || defined(_WIN64)
 #include <Windows.h>
 #else
 #include <dlfcn.h>
 #include <mach-o/dyld.h>
+#include <limits.h>
 #include <codecvt>
 #include <locale>
 #endif
@@ -34,86 +42,295 @@ RED4EXT_INLINE uintptr_t RED4ext::RelocBase::GetImageBase()
 RED4EXT_INLINE
 uintptr_t RED4ext::UniversalRelocBase::Resolve(uint32_t aHash)
 {
-#if !defined(_WIN32) && !defined(_WIN64)
-    // MARKER: This is TweakXL's modified SDK Resolve function
-    static bool firstCall = true;
-    if (firstCall) {
-        std::cerr << ">>> TWEAKXL_SDK_RESOLVE_MARKER: Using modified Resolve function <<<" << std::endl;
-        firstCall = false;
-    }
-    
-    // macOS: Use built-in address table to avoid dependency on RED4ext's limited addresses
-    // This is necessary because RED4ext only has 9 addresses configured, but the SDK
-    // and mods like TweakXL need many more.
-    static const uintptr_t imageBase = std::bit_cast<uintptr_t>(_dyld_get_image_header(0));
-    
-    // Address table for Cyberpunk 2077 macOS ARM64 v2.3.1
-    // Most of these are placeholders (0x0) - they need to be reverse engineered
-    static const std::unordered_map<uint32_t, uintptr_t> macOSAddressTable = {
-        // Main function (hash: 240386859 = 0x0E54032B) - Entry point from LC_MAIN
-        { 240386859, 0x31E18 },
-        
-        // TweakDB functions (need reverse engineering)
-        { 3062572522, 0x0 }, // TweakDB_Init
-        { 3602585178, 0x0 }, // TweakDB_Load
-        { 3512345737, 0x0 }, // TweakDB_TryLoad
-        { 838931066, 0x0 },  // TweakDB_CreateRecord
-        { 326438016, 0x0 },  // TweakDBID_Derive
-        
-        // StatsDataSystem functions (need reverse engineering)
-        { 1299190886, 0x0 }, // StatsDataSystem_InitializeRecords
-        { 3652194890, 0x0 }, // StatsDataSystem_InitializeParams
-        { 1444748215, 0x0 }, // StatsDataSystem_GetStatRange
-        { 3123320294, 0x0 }, // StatsDataSystem_GetStatFlags
-        { 2954893634, 0x0 }, // StatsDataSystem_CheckStatFlag
-        
-        // SDK internal functions (need reverse engineering)
-        { 405668637, 0x0 },  // CBaseFunction_InternalExecute
-    };
-    
-    auto it = macOSAddressTable.find(aHash);
-    if (it != macOSAddressTable.end() && it->second != 0)
-    {
-        return imageBase + it->second;
-    }
-    
-    // Address not found or placeholder - return a non-zero sentinel value
-    // This prevents null pointer crashes while making it clear something is wrong
-    // The calling code should handle this gracefully
-    static bool firstWarning = true;
-    if (firstWarning) {
-        std::cerr << "=== SDK ADDRESS RESOLUTION WARNING ===" << std::endl;
-        std::cerr << "TweakXL needs addresses that haven't been reverse-engineered yet for macOS." << std::endl;
-        std::cerr << "The mod will attempt to load but some features may not work." << std::endl;
-        std::cerr << "=======================================" << std::endl;
-        firstWarning = false;
-    }
-    std::cerr << "[SDK AddressResolver] Missing hash 0x" << std::hex << aHash << std::dec << std::endl;
-    
-    // Return a valid but harmless address (pointing to a ret instruction or similar)
-    // For now, return 0 - the caller must handle null gracefully
-    return 0;
-#else
     if constexpr (Detail::AddressResolverOverride<uint32_t>::value)
     {
         return Detail::AddressResolverOverride<uint32_t>::Resolve(aHash);
     }
-    else
+
+// ============================================================================
+// macOS Address Resolution
+// ============================================================================
+// On macOS, addresses are resolved from a JSON database file instead of using
+// the Windows Address Library. The database maps FNV1a hash values to offsets
+// within the game's __TEXT segment.
+//
+// Database Format (cyberpunk2077_addresses.json):
+// {
+//   "version": "1.0",
+//   "game_version": "2.3.1",
+//   "stats": { "total": 126, "resolved": 126, "unresolved": 0 },
+//   "Addresses": [
+//     { "hash": "1234567890", "offset": "1:0xABCDEF00" }
+//   ]
+// }
+//
+// Offset format: "segment:0xOFFSET" where segment is always 1 (__TEXT)
+//
+// Search paths (in order):
+//   1. $RED4EXT_SDK_ADDRESS_DB environment variable
+//   2. Same directory as the plugin (.dylib)
+//   3. red4ext/ or red4ext/bin/x64/ relative to plugin
+//   4. Same directory as the game executable
+//   5. red4ext/ or red4ext/bin/x64/ relative to executable
+//
+// Validation: Run scripts/check_addresses.py --strict
+// ============================================================================
+
+#if !defined(_WIN32) && !defined(_WIN64)
+    struct AddressDb
     {
-        const auto resolveFunc = GetAddressResolverFunction();
+        std::once_flag initOnce;
+        std::unordered_map<std::uint32_t, std::uintptr_t> offsets;
+        bool loaded{false};
+        std::filesystem::path path;
+    };
 
-        auto address = resolveFunc(aHash);
-        if (address == 0)
+    /// Parse a decimal string to uint32_t. Returns false on parse failure.
+    auto tryParseU32 = [](std::string_view aStr, std::uint32_t& aOut) -> bool
+    {
+        aOut = 0;
+        const char* begin = aStr.data();
+        const char* end = aStr.data() + aStr.size();
+        auto res = std::from_chars(begin, end, aOut, 10);
+        return res.ec == std::errc{} && res.ptr == end;
+    };
+
+    /// Parse offset string in format "segment:0xHEX" (segment must be 1 for __TEXT).
+    /// Returns false if format is invalid or segment != 1.
+    auto tryParseOffset = [&tryParseU32](std::string_view aStr, std::uintptr_t& aOut) -> bool
+    {
+        // Format: segment:0xHEX (segment 1 is __TEXT)
+        aOut = 0;
+        const auto colon = aStr.find(':');
+        if (colon == std::string_view::npos)
+            return false;
+
+        std::uint32_t segment = 0;
+        if (!tryParseU32(aStr.substr(0, colon), segment))
+            return false;
+
+        auto rest = aStr.substr(colon + 1);
+        if (rest.size() < 3 || rest[0] != '0' || (rest[1] != 'x' && rest[1] != 'X'))
+            return false;
+
+        rest.remove_prefix(2);
+        std::uintptr_t value = 0;
+        auto res = std::from_chars(rest.data(), rest.data() + rest.size(), value, 16);
+        if (res.ec != std::errc{} || res.ptr != rest.data() + rest.size())
+            return false;
+
+        // Only segment 1 (__TEXT) is supported for macOS game executables
+        if (segment != 1)
+            return false;
+
+        aOut = value;
+        return true;
+    };
+
+    /// Extract a quoted string value that follows a given key in JSON.
+    /// Example: Given text '{"hash":"123"}' and key '"hash"', returns "123".
+    /// Returns empty string_view and npos if not found or format is invalid.
+    auto extractQuotedValueAfterKey = [](std::string_view aText, std::string_view aKey, size_t aFrom) ->
+        std::pair<std::string_view, size_t>
+    {
+        const auto keyPos = aText.find(aKey, aFrom);
+        if (keyPos == std::string_view::npos)
+            return {{}, std::string_view::npos};
+
+        auto pos = aText.find(':', keyPos + aKey.size());
+        if (pos == std::string_view::npos)
+            return {{}, std::string_view::npos};
+
+        pos = aText.find('"', pos);
+        if (pos == std::string_view::npos)
+            return {{}, std::string_view::npos};
+
+        const auto start = pos + 1;
+        const auto end = aText.find('"', start);
+        if (end == std::string_view::npos)
+            return {{}, std::string_view::npos};
+
+        return {aText.substr(start, end - start), end + 1};
+    };
+
+    auto loadAddressDb = [&]() -> AddressDb&
+    {
+        static AddressDb db;
+        std::call_once(db.initOnce,
+                       [&]()
+                       {
+                           auto tryLoadFromPath = [&](const std::filesystem::path& aPath) -> bool
+                           {
+                               std::ifstream file(aPath);
+                               if (!file)
+                                   return false;
+
+                               std::string contents((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+                               if (contents.empty())
+                                   return false;
+
+                               std::string_view text(contents);
+                               size_t pos = 0;
+                               while (true)
+                               {
+                                   auto [hashStr, hashNext] = extractQuotedValueAfterKey(text, "\"hash\"", pos);
+                                   if (hashNext == std::string_view::npos)
+                                       break;
+                                   auto [offStr, offNext] = extractQuotedValueAfterKey(text, "\"offset\"", hashNext);
+                                   if (offNext == std::string_view::npos)
+                                       break;
+
+                                   std::uint32_t hash = 0;
+                                   std::uintptr_t offset = 0;
+                                   if (tryParseU32(hashStr, hash) && tryParseOffset(offStr, offset))
+                                   {
+                                       db.offsets.emplace(hash, offset);
+                                   }
+
+                                   pos = offNext;
+                               }
+
+                               if (!db.offsets.empty())
+                               {
+                                   db.loaded = true;
+                                   db.path = aPath;
+                                   return true;
+                               }
+
+                               return false;
+                           };
+
+                           const char* envPath = std::getenv("RED4EXT_SDK_ADDRESS_DB");
+                           if (envPath && *envPath)
+                           {
+                               if (tryLoadFromPath(envPath))
+                                   return;
+                           }
+
+                           static constexpr auto fileName = "cyberpunk2077_addresses.json";
+
+                           auto tryLoadFromRed4extRootNear = [&](std::filesystem::path aStart) -> bool
+                           {
+                               for (int i = 0; i < 10 && !aStart.empty(); ++i)
+                               {
+                                   std::filesystem::path red4extRoot;
+                                   if (aStart.filename() == "red4ext")
+                                   {
+                                       red4extRoot = aStart;
+                                   }
+                                   else
+                                   {
+                                       auto candidate = aStart / "red4ext";
+                                       if (std::filesystem::exists(candidate) && std::filesystem::is_directory(candidate))
+                                       {
+                                           red4extRoot = candidate;
+                                       }
+                                   }
+
+                                   if (!red4extRoot.empty())
+                                   {
+                                       if (tryLoadFromPath(red4extRoot / fileName))
+                                           return true;
+                                       if (tryLoadFromPath(red4extRoot / "bin" / "x64" / fileName))
+                                           return true;
+                                   }
+
+                                   aStart = aStart.parent_path();
+                               }
+                               return false;
+                           };
+
+                           const auto modulePath = GetCurrentModulePath();
+                           if (!modulePath.empty())
+                           {
+                               if (tryLoadFromPath(modulePath.parent_path() / fileName))
+                                   return;
+
+                               // Common layout: <game>/red4ext/plugins/<PluginName>/<plugin>.dylib
+                               if (tryLoadFromRed4extRootNear(modulePath.parent_path()))
+                                   return;
+                           }
+
+                           char exePathBuf[PATH_MAX] = {};
+                           std::uint32_t exeSize = sizeof(exePathBuf);
+                           if (_NSGetExecutablePath(exePathBuf, &exeSize) == 0)
+                           {
+                               const auto exeDir = std::filesystem::path(exePathBuf).parent_path();
+                               if (tryLoadFromPath(exeDir / fileName))
+                                   return;
+
+                               // Also try <game>/red4ext/... by walking up from the executable directory.
+                               if (tryLoadFromRed4extRootNear(exeDir))
+                                   return;
+                           }
+                       });
+        return db;
+    };
+
+    const auto base = RelocBase::GetImageBase();
+    auto& db = loadAddressDb();
+    if (db.loaded)
+    {
+        static std::once_flag loadedOnce;
+        std::call_once(loadedOnce,
+                       [&]()
+                       {
+                           std::cerr << "[RED4ext.SDK] Loaded " << db.offsets.size() << " address entries from "
+                                     << db.path.string() << "\n";
+                       });
+
+        const auto it = db.offsets.find(aHash);
+        if (it != db.offsets.end() && it->second != 0)
         {
-            std::wostringstream stream;
-            stream << L"Failed to find the address for the hash (" << std::dec << aHash << ") provided by the plugin.\n"
-                   << L"This issue is likely caused by the mod using an incorrect or outdated hash.";
-
-            ShowErrorAndTerminateProcess(stream.str(), 0);
+            return base + it->second;
         }
-
-        return address;
     }
+
+    static std::atomic_uint32_t missingCount{0};
+    const auto missingIdx = ++missingCount;
+    if (missingIdx <= 10)
+    {
+        std::cerr << "[RED4ext.SDK] Missing address hash 0x" << std::hex << aHash << std::dec;
+        if (db.loaded)
+        {
+            std::cerr << " (not present or offset=0 in " << db.path.string() << ")";
+        }
+        std::cerr << "\n";
+        if (missingIdx == 10)
+        {
+            std::cerr << "[RED4ext.SDK] Further missing-hash logs suppressed." << "\n";
+        }
+    }
+
+    // Fallback: ask RED4ext for the address if the runtime provides a resolver.
+    const auto resolveFunc = GetAddressResolverFunction();
+    const auto address = resolveFunc(aHash);
+    if (address == 0)
+    {
+        static std::once_flag warnOnce;
+        std::call_once(warnOnce,
+                       [&]()
+                       {
+                           std::cerr
+                               << "[RED4ext.SDK] macOS address resolution returned 0 for at least one hash. "
+                                  "Ensure cyberpunk2077_addresses.json is present and matches the game version.\n";
+                       });
+    }
+    return address;
+#else
+    const auto resolveFunc = GetAddressResolverFunction();
+
+    auto address = resolveFunc(aHash);
+    if (address == 0)
+    {
+        std::wostringstream stream;
+        stream << L"Failed to find the address for the hash (" << std::dec << aHash << ") provided by the plugin.\n"
+               << L"This issue is likely caused by the mod using an incorrect or outdated hash.";
+
+        ShowErrorAndTerminateProcess(stream.str(), 0);
+    }
+
+    return address;
 #endif
 }
 
@@ -320,22 +537,6 @@ RED4EXT_INLINE void RED4ext::UniversalRelocBase::ShowErrorAndTerminateProcess(st
                                                                               std::uint32_t aLastError,
                                                                               bool aQueryPluginInfo)
 {
-#if !defined(_WIN32) && !defined(_WIN64)
-    // macOS: Don't terminate - just log the error
-    // This is a workaround until we have proper address resolution
-    // Convert wide string to narrow for stderr
-    {
-        std::string macOSMsg;
-        for (wchar_t c : aMsg) {
-            if (c < 0x80) macOSMsg += static_cast<char>(c);
-            else if (c == L'\n') macOSMsg += '\n';
-            else macOSMsg += '?';
-        }
-        std::cerr << "[SDK] Address resolution warning (non-fatal on macOS): " << macOSMsg << std::endl;
-    }
-    return; // Don't crash - let the code continue with null function pointer
-#endif
-    
     const auto path = GetCurrentModulePath();
 
 #if defined(_WIN32) || defined(_WIN64)

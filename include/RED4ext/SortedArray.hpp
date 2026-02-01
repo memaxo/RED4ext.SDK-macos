@@ -25,8 +25,8 @@ struct SortedArray
 
     SortedArray(Memory::IAllocator* aAllocator = nullptr)
         : entries(aAllocator ? *reinterpret_cast<T**>(aAllocator) : nullptr)
-        , size(0)
         , capacity(0)
+        , size(0)
         , flags(0)
     {
     }

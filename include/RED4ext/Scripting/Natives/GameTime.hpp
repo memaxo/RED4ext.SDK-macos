@@ -19,13 +19,13 @@ struct GameTime
     GameTime(uint32_t aHour, uint32_t aMinute, uint32_t aSecond);
     GameTime(uint32_t aDay, uint32_t aHour, uint32_t aMinute, uint32_t aSecond);
 
-    const std::string ToString() const;
-    const uint32_t ToSeconds() const;
+    std::string ToString() const;
+    uint32_t ToSeconds() const;
 
-    const uint32_t GetDay() const;
-    const uint32_t GetHour() const;
-    const uint32_t GetMinute() const;
-    const uint32_t GetSecond() const;
+    uint32_t GetDay() const;
+    uint32_t GetHour() const;
+    uint32_t GetMinute() const;
+    uint32_t GetSecond() const;
 
     void SetDay(uint32_t aDay);
     void SetHour(uint32_t aHour);
