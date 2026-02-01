@@ -23,16 +23,26 @@
 #define RED4EXT_ASSERT_SIZE(cls, size)                                                                                 \
     static_assert(sizeof(cls) == size, #cls " size does not match the expected size (" #size ") ")
 #else
-// On macOS, structure sizes may differ from Windows due to ABI differences.
-// Disable size assertions for now; these will need verification against macOS binary.
+// On macOS, enable layout verification only when explicitly requested.
+// This avoids forcing Windows-derived layouts on platforms that may legitimately differ.
+#if defined(__APPLE__) && defined(RED4EXT_ENABLE_MACOS_LAYOUT_ASSERTS)
+#define RED4EXT_ASSERT_SIZE(cls, size)                                                                                 \
+    static_assert(sizeof(cls) == size, #cls " size does not match the expected size (" #size ") ")
+#else
 #define RED4EXT_ASSERT_SIZE(cls, size) /* disabled on macOS */
+#endif
 #endif
 #endif
 
 #ifndef RED4EXT_ASSERT_OFFSET
-// TODO: find a better way to handle this (clang does not allow offsetof in static_assert)
-#ifdef __clang__
+// Use __builtin_offsetof for clang.
+#if defined(__clang__)
+#if defined(__APPLE__) && defined(RED4EXT_ENABLE_MACOS_LAYOUT_ASSERTS)
+#define RED4EXT_ASSERT_OFFSET(cls, mbr, offset)                                                                        \
+    static_assert(__builtin_offsetof(cls, mbr) == offset, #cls "::" #mbr " is not on the expected offset (" #offset ")")
+#else
 #define RED4EXT_ASSERT_OFFSET(cls, mbr, offset)
+#endif
 #else
 #define RED4EXT_ASSERT_OFFSET(cls, mbr, offset)                                                                        \
     static_assert(offsetof(cls, mbr) == offset, #cls "::" #mbr " is not on the expected offset (" #offset ")")
@@ -43,7 +53,7 @@
  * @brief This macro is used to avoid compiler warnings about unreferenced / used parameter.
  */
 #ifndef RED4EXT_UNUSED_PARAMETER
-#define RED4EXT_UNUSED_PARAMETER(param) (param)
+#define RED4EXT_UNUSED_PARAMETER(param) (void)(param)
 #endif
 
 #ifndef RED4EXT_DECLARE_TYPE

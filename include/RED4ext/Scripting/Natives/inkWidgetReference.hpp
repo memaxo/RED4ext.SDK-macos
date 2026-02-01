@@ -12,8 +12,8 @@ struct WidgetReference
     static constexpr const char* NAME = "inkWidgetReference";
     static constexpr const char* ALIAS = "inkWidgetRef";
 
-    virtual CClass* GetNativeType() {}; // 00
-    virtual CClass* GetType() {};       // 08
+    virtual CClass* GetNativeType() { return nullptr; }; // 00
+    virtual CClass* GetType() { return nullptr; };       // 08
 
     WeakHandle<Widget> widget; // 08
 };

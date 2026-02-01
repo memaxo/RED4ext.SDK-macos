@@ -43,7 +43,11 @@ inline void SwitchToThread()
 }
 }
 
-using namespace Platform;
+// Match the Windows API surface (global SwitchToThread).
+inline void SwitchToThread()
+{
+    Platform::SwitchToThread();
+}
 
 // Interlocked functions - standard sizes
 #define InterlockedIncrement(ptr) __atomic_add_fetch(ptr, 1, __ATOMIC_SEQ_CST)

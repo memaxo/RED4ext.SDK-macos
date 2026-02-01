@@ -22,7 +22,7 @@ RED4EXT_INLINE RED4ext::GameTime::GameTime(uint32_t aDay, uint32_t aHour, uint32
     SetTime(aDay, aHour, aMinute, aSecond);
 }
 
-RED4EXT_INLINE const std::string RED4ext::GameTime::ToString() const
+RED4EXT_INLINE std::string RED4ext::GameTime::ToString() const
 {
     std::stringstream result;
     result << GetDay() << " " << std::setfill('0') << std::setw(2) << GetHour() << ":" << std::setw(2) << GetMinute()
@@ -30,27 +30,27 @@ RED4EXT_INLINE const std::string RED4ext::GameTime::ToString() const
     return result.str();
 }
 
-RED4EXT_INLINE const uint32_t RED4ext::GameTime::ToSeconds() const
+RED4EXT_INLINE uint32_t RED4ext::GameTime::ToSeconds() const
 {
     return seconds;
 }
 
-RED4EXT_INLINE const uint32_t RED4ext::GameTime::GetDay() const
+RED4EXT_INLINE uint32_t RED4ext::GameTime::GetDay() const
 {
     return seconds / OneDay;
 }
 
-RED4EXT_INLINE const uint32_t RED4ext::GameTime::GetHour() const
+RED4EXT_INLINE uint32_t RED4ext::GameTime::GetHour() const
 {
     return (seconds % OneDay) / OneHour;
 }
 
-RED4EXT_INLINE const uint32_t RED4ext::GameTime::GetMinute() const
+RED4EXT_INLINE uint32_t RED4ext::GameTime::GetMinute() const
 {
     return (seconds % OneHour) / OneMinute;
 }
 
-RED4EXT_INLINE const uint32_t RED4ext::GameTime::GetSecond() const
+RED4EXT_INLINE uint32_t RED4ext::GameTime::GetSecond() const
 {
     return seconds % OneMinute;
 }

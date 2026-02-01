@@ -1,0 +1,46 @@
+{
+  "version": "1.0",
+  "game_version": "2.3.1",
+  "hooks": [
+    {
+      "hash": "0xFBC216B3",
+      "name": "CGameApplication_AddState",
+      "offset": "1:0x3F22E98"
+    },
+    {
+      "hash": "0x835D1F2F",
+      "name": "Global_ExecuteProcess",
+      "offset": "1:0x1D46808"
+    },
+    {
+      "hash": "0xAB652585",
+      "name": "CBaseEngine_InitScripts",
+      "offset": "1:0x3D8C1A0"
+    },
+    {
+      "hash": "0xD4CB1D59",
+      "name": "CBaseEngine_LoadScripts",
+      "offset": "1:0x3D9A03C"
+    },
+    {
+      "hash": "0x359024C2",
+      "name": "ScriptValidator_Validate",
+      "offset": "1:0x3D96BFC"
+    },
+    {
+      "hash": "0xFF6B0CB1",
+      "name": "AssertionFailed",
+      "offset": "1:0x3C3D4C"
+    },
+    {
+      "hash": "0xC0886390",
+      "name": "GameInstance_CollectSaveableSystems",
+      "offset": "1:0x87FEC"
+    },
+    {
+      "hash": "0x7FA31576",
+      "name": "GsmState_SessionActive_ReportErrorCode",
+      "offset": "1:0x3F5E9B0"
+    }
+  ]
+}

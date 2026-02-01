@@ -21,7 +21,7 @@ RED4EXT_INLINE RED4ext::Handle<RED4ext::IScriptable> RED4ext::TweakDB::GetRecord
 {
     RED4ext::Handle<RED4ext::IScriptable> record;
     TryGetRecord(aDBID, record);
-    return std::move(record);
+    return record;
 }
 
 RED4EXT_INLINE bool RED4ext::TweakDB::TryGetRecord(TweakDBID aDBID, Handle<IScriptable>& aRecord)
@@ -43,7 +43,7 @@ RED4EXT_INLINE RED4ext::DynArray<RED4ext::Handle<RED4ext::IScriptable>> RED4ext:
 {
     RED4ext::DynArray<RED4ext::Handle<RED4ext::IScriptable>> records;
     TryGetRecordsByType(aType, records);
-    return std::move(records);
+    return records;
 }
 
 RED4EXT_INLINE bool RED4ext::TweakDB::TryGetRecordsByType(CBaseRTTIType* aType,
@@ -85,7 +85,7 @@ RED4EXT_INLINE RED4ext::DynArray<RED4ext::TweakDBID> RED4ext::TweakDB::Query(Twe
 {
     RED4ext::DynArray<RED4ext::TweakDBID> array;
     TryQuery(aDBID, array);
-    return std::move(array);
+    return array;
 }
 
 RED4EXT_INLINE bool RED4ext::TweakDB::TryQuery(TweakDBID aDBID, DynArray<TweakDBID>& aArray)
@@ -209,7 +209,7 @@ RED4EXT_INLINE bool RED4ext::TweakDB::UpdateRecord(gamedataTweakDBRecord* aRecor
             RED4EXT_UNUSED_PARAMETER(aMemory);
         }
 
-        virtual const uint32_t GetHandle() const override
+        virtual uint32_t GetHandle() const override
         {
             return 0;
         }

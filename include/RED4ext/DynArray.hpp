@@ -23,8 +23,8 @@ struct DynArray
 {
     DynArray(Memory::IAllocator* aAllocator = nullptr)
         : entries(aAllocator ? *reinterpret_cast<T**>(aAllocator) : nullptr)
-        , size(0)
         , capacity(0)
+        , size(0)
     {
     }
 

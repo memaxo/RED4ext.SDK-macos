@@ -7,17 +7,17 @@
 #include <RED4ext/RTTITypes.hpp>
 
 RED4EXT_INLINE RED4ext::ScriptReport::ScriptReport() noexcept
-    : errors(&unk10)
+    : fillErrors(true)
+    , errors(&unk10)
     , maxErrors(0)
-    , fillErrors(true)
 {
 }
 
 RED4EXT_INLINE RED4ext::ScriptReport::ScriptReport(RED4ext::DynArray<RED4ext::CString>& aErrors,
                                                    uint32_t aMaxErrors) noexcept
-    : errors(&aErrors)
+    : fillErrors(true)
+    , errors(&aErrors)
     , maxErrors(aMaxErrors)
-    , fillErrors(true)
 {
 }
 

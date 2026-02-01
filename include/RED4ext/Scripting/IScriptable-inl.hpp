@@ -9,8 +9,8 @@
 #include <RED4ext/Relocation.hpp>
 
 RED4EXT_INLINE RED4ext::IScriptable::IScriptable()
-    : valueHolder(nullptr)
-    , nativeType(nullptr)
+    : nativeType(nullptr)
+    , valueHolder(nullptr)
 {
 }
 

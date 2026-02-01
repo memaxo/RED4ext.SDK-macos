@@ -39,6 +39,8 @@ struct Vector4
     {
     }
 
+    constexpr Vector4(const Vector4&) noexcept = default;
+
     inline Vector4& operator=(const Vector4& aOther)
     {
         if (this != &aOther)

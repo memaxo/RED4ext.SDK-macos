@@ -53,9 +53,9 @@ struct CBaseRTTIType
     virtual CName GetComputedName() const;                    // 30
     virtual void Construct(ScriptInstance aMemory) const = 0; // 38
     virtual void Destruct(ScriptInstance aMemory) const = 0;  // 40
-    virtual const bool IsEqual(const ScriptInstance aLhs, const ScriptInstance aRhs,
-                               uint32_t a3 = 0) = 0; // 48 - Not const because CClass aquire some mutex when this is
-                                                     // called and a flag is modified.
+    virtual bool IsEqual(const ScriptInstance aLhs, const ScriptInstance aRhs,
+                         uint32_t a3 = 0) = 0; // 48 - Not const because CClass aquire some mutex when this is
+                                              // called and a flag is modified.
     virtual void Assign(ScriptInstance aLhs, const ScriptInstance aRhs) const = 0;                 // 50
     virtual void Move(ScriptInstance aLhs, ScriptInstance aRhs) const;                             // 58
     virtual bool Unserialize(BaseStream* aStream, ScriptInstance aInstance, int64_t a3) const = 0; // 60
@@ -250,7 +250,7 @@ struct TTypedClass : CClass
     {
     }
 
-    const bool IsEqual(const ScriptInstance aLhs, const ScriptInstance aRhs, uint32_t a3 = 0) final // 48
+    bool IsEqual(const ScriptInstance aLhs, const ScriptInstance aRhs, uint32_t a3 = 0) final // 48
     {
         // This is doing something extra beside comparing properties, using the native func until we figure it out.
         using func_t = bool (*)(TTypedClass<T>*, const ScriptInstance, const ScriptInstance, uint32_t);
@@ -308,7 +308,7 @@ struct CEnum : CBaseRTTIType
     CName GetComputedName() const final;                                                             // 30
     void Construct(ScriptInstance aMemory) const final;                                              // 38
     void Destruct(ScriptInstance aMemory) const final;                                               // 40
-    const bool IsEqual(const ScriptInstance aLhs, const ScriptInstance aRhs, uint32_t a3 = 0) final; // 48
+    bool IsEqual(const ScriptInstance aLhs, const ScriptInstance aRhs, uint32_t a3 = 0) final; // 48
     void Assign(ScriptInstance aLhs, const ScriptInstance aRhs) const final;                         // 50
     bool Unserialize(BaseStream* aStream, ScriptInstance aInstance, int64_t a3) const final;         // 60
     bool ToString(const ScriptInstance aInstance, CString& aOut) const final;                        // 68
@@ -351,7 +351,7 @@ struct CBitfield : CBaseRTTIType
     CName GetComputedName() const final;                                                             // 30
     void Construct(ScriptInstance aMemory) const final;                                              // 38
     void Destruct(ScriptInstance aMemory) const final;                                               // 40
-    const bool IsEqual(const ScriptInstance aLhs, const ScriptInstance aRhs, uint32_t a3 = 0) final; // 48
+    bool IsEqual(const ScriptInstance aLhs, const ScriptInstance aRhs, uint32_t a3 = 0) final; // 48
     void Assign(ScriptInstance aLhs, const ScriptInstance aRhs) const final;                         // 50
     bool Unserialize(BaseStream* aStream, ScriptInstance aInstance, int64_t a3) const final;         // 60
     bool ToString(const ScriptInstance aInstance, CString& aOut) const final;                        // 68

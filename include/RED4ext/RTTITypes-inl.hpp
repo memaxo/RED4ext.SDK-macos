@@ -185,14 +185,14 @@ RED4EXT_INLINE RED4ext::CClass::CClass(CName aName, uint32_t aSize, Flags aFlags
     : parent(nullptr)
     , name(aName)
     , computedName(CBaseRTTIType::GetComputedName())
-    , size(aSize)
-    , flags(aFlags)
-    , holderSize(0)
-    , alignment(4)
     , props(Memory::RTTIAllocator::Get())
     , overriddenProps(Memory::RTTIAllocator::Get())
     , funcs(Memory::RTTIAllocator::Get())
     , staticFuncs(Memory::RTTIAllocator::Get())
+    , size(aSize)
+    , holderSize(0)
+    , flags(aFlags)
+    , alignment(4)
     , funcsByName(Memory::RTTIAllocator::Get())
     , unkA8(Memory::RTTIAllocator::Get())
     , unkD8(0)
@@ -468,7 +468,7 @@ RED4EXT_INLINE void RED4ext::CEnum::Destruct(ScriptInstance aMemory) const
     RED4EXT_UNUSED_PARAMETER(aMemory);
 }
 
-RED4EXT_INLINE const bool RED4ext::CEnum::IsEqual(const ScriptInstance aLhs, const ScriptInstance aRhs, uint32_t a3)
+RED4EXT_INLINE bool RED4ext::CEnum::IsEqual(const ScriptInstance aLhs, const ScriptInstance aRhs, uint32_t a3)
 {
     RED4EXT_UNUSED_PARAMETER(a3);
 
@@ -588,7 +588,7 @@ RED4EXT_INLINE void RED4ext::CBitfield::Destruct(ScriptInstance aMemory) const
     RED4EXT_UNUSED_PARAMETER(aMemory);
 }
 
-RED4EXT_INLINE const bool RED4ext::CBitfield::IsEqual(const ScriptInstance aLhs, const ScriptInstance aRhs, uint32_t a3)
+RED4EXT_INLINE bool RED4ext::CBitfield::IsEqual(const ScriptInstance aLhs, const ScriptInstance aRhs, uint32_t a3)
 {
     RED4EXT_UNUSED_PARAMETER(a3);
 

@@ -9,6 +9,7 @@ namespace RED4ext
 struct TLS
 {
     static TLS* Get();
+    static bool IsInitialized();
 
     uint8_t unk00[0x19A]; // 00
     uint8_t jobParam;     // 19A
